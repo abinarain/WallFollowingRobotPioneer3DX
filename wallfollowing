@@ -1,0 +1,122 @@
+##########################################################################
+#Author: Abhishek N. Singh
+#This is a script for Pioneer 3-DX Robot to follow a wall without collision
+#Date: 6th October 2020
+#Email: abhishek.narain@iitdalumni.com
+#############################################################################
+
+from controller import Robot
+
+
+def getDistance(sensor):
+    """
+    Return the distance of an obstacle for a sensor.
+
+    The value returned by the getValue() method of the distance sensors
+    corresponds to a physical value (here we have a sonar, so it is the
+    strength of the sonar ray). This function makes a conversion to a
+    distance value in meters.
+    """
+    return ((1000 - sensor.getValue()) / 1000) * 5
+
+# Maximum speed for the velocity value of the wheels.
+# Don't change this value.
+MAX_SPEED = 5.24 
+
+#Get pointer to the robot
+robot = Robot()
+
+# Get the time step of the current world.
+timestep = int(robot.getBasicTimeStep())
+
+#Get pointer to the robot wheels motors.
+leftWheel = robot.getMotor('left wheel')
+rightWheel = robot.getMotor('right wheel')
+
+#We will use the velocity parameter of the wheels, so we need to 
+#set the target position to infinity.
+leftWheel.setPosition(float('inf'))
+rightWheel.setPosition(float('inf'))
+
+#Get and enable the distance sensors.
+frontSensor = robot.getDistanceSensor("so3")
+frontSensor.enable(timestep)
+sideSensor = robot.getDistanceSensor("so0")
+sideSensor.enable(timestep)
+headonSensor = robot.getDistanceSensor("so4")
+headonSensor.enable(timestep)
+rightsideSensor = robot.getDistanceSensor("so5")
+rightsideSensor.enable(timestep)
+
+#Get side left and front left sensors too
+rearleftSensor = robot.getDistanceSensor("so15")
+rearleftSensor.enable(timestep)
+frontleftSensor = robot.getDistanceSensor("so1")
+frontleftSensor.enable(timestep)
+
+# Move forward until we are 50 cm away from the wall.
+leftWheel.setVelocity(MAX_SPEED)
+rightWheel.setVelocity(MAX_SPEED)
+while robot.step(timestep) != -1:
+    # Walk until the robot is only 50 cm away from wall
+    if getDistance(frontSensor) < 0.3:
+        break
+
+# Rotate clockwise until the wall is to our left.
+leftWheel.setVelocity(MAX_SPEED)
+rightWheel.setVelocity(-MAX_SPEED)
+while robot.step(timestep) != -1:
+    if getDistance(rearleftSensor) < 1:
+        break
+
+#Main loop.
+while robot.step(timestep) != -1:
+   
+    
+    #If we are actually very close to the wall then we need to turn faster to the right
+    if (getDistance(sideSensor) < 0.08):
+        leftWheel.setVelocity(MAX_SPEED)
+        rightWheel.setVelocity(MAX_SPEED * 0.39)
+    #Close to the wall, we need to turn right
+    elif ((getDistance(sideSensor) < 0.3) or (getDistance(rearleftSensor) > 0.3)): #i.e. either the front end is too close to waall or the back end is too far from wall so we need to turn right
+        leftWheel.setVelocity(MAX_SPEED)
+        rightWheel.setVelocity(MAX_SPEED * 0.995)
+        
+    #Too far from the wall so we turn left 
+    elif ((getDistance(sideSensor) > 0.3) or (getDistance(rearleftSensor) < 0.3)): #Either the front end is too far or the back end is too near
+        leftWheel.setVelocity(MAX_SPEED * 0.995)
+        rightWheel.setVelocity(MAX_SPEED)
+        #If the robot is really far from the wall we take a steeper  turn
+        if getDistance(sideSensor) > 0.45:
+            leftWheel.setVelocity(MAX_SPEED * 0.40)#slowing the left wheel further
+            rightWheel.setVelocity(MAX_SPEED)
+        #If the robot is really really far, we take a much steeper  turn
+        if getDistance(sideSensor) > 0.8:
+            leftWheel.setVelocity(MAX_SPEED * 0.16)#slowing the left wheel much more
+            rightWheel.setVelocity(MAX_SPEED)
+    
+    #Now we can go with right speed since we are in right direction
+    else:
+        leftWheel.setVelocity(MAX_SPEED)
+        rightWheel.setVelocity(MAX_SPEED)
+    
+    #If the robot is far from the wall as detected by side and front left sensor we take a left turn
+    if (getDistance(sideSensor) > 0.8) and (getDistance(frontleftSensor) > 2):
+        leftWheel.setVelocity(MAX_SPEED * 0.45)
+        rightWheel.setVelocity(MAX_SPEED)
+    
+    #We check for the front left part of robot coming close to an edge or there is a head on collision and if so we take a right turn.
+    if((getDistance(frontleftSensor) < 0.02) or ( getDistance(frontSensor) < 4) or (getDistance(headonSensor) < 4) or (getDistance(rightsideSensor) < 1)):
+        leftWheel.setVelocity(  MAX_SPEED  )
+        rightWheel.setVelocity( - MAX_SPEED )
+        #If the robot is very close for a head-on collision to wall, it changes direction
+        #if ( (getDistance(frontSensor) < 0.30) or (getDistance(headonSensor) < 0.3) ):
+        #    leftWheel.setVelocity(-MAX_SPEED)
+        #    rightWheel.setVelocity(-MAX_SPEED)
+   
+    
+    
+
+#Stop the robot when we are done.
+leftWheel.setVelocity(0)
+rightWheel.setVelocity(0)
